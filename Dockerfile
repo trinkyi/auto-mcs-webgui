@@ -7,12 +7,13 @@ ARG DEBIAN_FRONTEND=noninteractive
 # Install virtual X server, lightweight window manager, VNC server, envsubst, and utilities
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
-  xvfb            # Virtual X11 server              \
-  fluxbox         # Lightweight window manager     \
-  x11vnc          # VNC server to share the X session \
-  wget            # Tool to download files         \
-  unzip           # Unzip archives                 \
-  gettext-base    # Provides envsubst for templating \
+  xvfb\
+  fluxbox\
+  x11vnc\
+  wget \
+  wget\
+  unzip\
+  gettext-base\
   ca-certificates && \
   rm -rf /var/lib/apt/lists/*  # Clean up APT cache
 
