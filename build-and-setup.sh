@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 1) .env einlesen
-if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
+# 1) Parameter laden
+if [[ -f .env ]]; then
+  # ignore comments, export key=val
+  export $(grep -v '^\s*#' .env | xargs)
 else
-  echo "ERROR: .env not found"
+  echo "ERROR: .env not found – bitte erstellen!"
   exit 1
 fi
 
@@ -15,16 +16,16 @@ docker build \
   --build-arg AUTO_MCS_ASSET="${AUTO_MCS_ASSET}" \
   -t "${IMAGE_NAME}:${IMAGE_TAG}" .
 
-# 3) XML aus Template generieren
-if [ -f "${TEMPLATE_FILE}" ]; then
+# 3) Guacamole-XML aus Template rendern
+if [[ -f "${TEMPLATE_FILE}" ]]; then
   echo "Rendering ${TEMPLATE_FILE} → ${OUTPUT_FILE}"
   envsubst < "${TEMPLATE_FILE}" > "${OUTPUT_FILE}"
-  if [ "${REMOVE_TEMPLATE}" = "true" ]; then
+  if [[ "${REMOVE_TEMPLATE}" == "true" ]]; then
     echo "Removing template ${TEMPLATE_FILE}"
     rm "${TEMPLATE_FILE}"
   fi
 else
-  echo "WARN: Template ${TEMPLATE_FILE} not found, skipping rendering"
+  echo "WARN: Template ${TEMPLATE_FILE} nicht gefunden, übersprungen"
 fi
 
-echo "Done. Du kannst jetzt mit docker-compose up -d starten."
+echo "Build & Setup abgeschlossen. Jetzt mit 'docker-compose up -d' starten."
