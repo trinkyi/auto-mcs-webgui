@@ -1,5 +1,5 @@
 # Use a minimal Debian Bookworm Slim base image
-FROM debian:bookworm-slim:stable
+FROM debian:bookworm-slim
 
 # Prevent interactive prompts during package installation
 ARG DEBIAN_FRONTEND=noninteractive
