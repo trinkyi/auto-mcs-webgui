@@ -1,0 +1,65 @@
+version: '3.8'
+
+#-------------------------------------------------------------------
+# Docker Compose Stack for auto-mcs + Apache Guacamole
+# 
+# This stack boots three services:
+#   1) auto-mcs   - Minecraft Automation GUI with VNC server
+#   2) guacd      - Guacamole proxy daemon for remote desktop
+#   3) guacamole  - HTML5 client to access VNC via browser
+#
+# To use:
+#   - Place this file alongside your Dockerfile for auto-mcs (context: '.')
+#   - Create named volumes or directories for persistence
+#   - Define the VNC_PASSWORD environment variable before deploying
+#   - Deploy via CLI (docker-compose up -d)
+#-------------------------------------------------------------------
+
+services:
+  automcs:
+    build:
+      context: .                 # Build context: directory containing Dockerfile
+      dockerfile: Dockerfile     # Dockerfile for auto-mcs + VNC
+    container_name: auto-mcs
+    environment:
+      - VNC_PASSWORD=${VNC_PASSWORD}  # VNC password; set via 'export VNC_PASSWORD=yourpass'
+    volumes:
+      - auto-mcs-data:/data      # Persist auto-mcs world and config data
+    expose:
+      - "5900"                  # Expose VNC server port internally for Guacamole
+    restart: unless-stopped      # Always restart unless explicitly stopped
+
+  guacd:
+    image: guacamole/guacd:latest
+    container_name: guacd
+    # guacd listens for Guacamole client connections on port 4822 by default
+    restart: unless-stopped
+
+  guacamole:
+    image: guacamole/guacamole:latest
+    container_name: guacamole
+    depends_on:
+      - guacd
+      - automcs
+    environment:
+      GUACD_HOSTNAME: guacd      # Hostname or service name of guacd
+      GUACD_PORT: 4822           # Default port guacd listens on
+      # If using a custom guacamole.properties or user-mapping.xml,
+      # mount them into /etc/guacamole via the volume below.
+    ports:
+      - "9000:8080"             # Map Guacamole web UI to host port 9000
+    volumes:
+      - guacamole:/etc/guacamole # Mount custom config (user-mapping.xml, extensions)
+    restart: unless-stopped
+
+# Use named volumes to persist data; avoids host-path issues in Portainer
+volumes:
+  auto-mcs:
+    name: auto-mcs_data
+  guacamole:
+    name: guacamole_config
+
+# All services share this default network
+networks:
+  default:
+    name: automcs_network

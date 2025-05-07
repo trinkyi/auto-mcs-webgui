@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Apache Guacamole user-mapping.xml
+  Defines one default user and an example (commented-out) second user.
+  See: https://guacamole.apache.org/doc/gug/configuring-guacamole.html#user-mapping
+-->
+<user-mapping>
+
+    <!-- Default user: admin -->
+    <authorize username="admin" password="ASecurePass!"> <!-- Change this password! -->
+        <connection name="auto-mcs">
+            <protocol>vnc</protocol>
+            <param name="hostname">automcs</param>
+            <param name="port">5900</param>
+            <param name="password">YourEnvPassword</param> <!-- This needs to be the exact same password you used in the environment variable for the Dockerfile -->
+        </connection>
+    </authorize>
+
+    <!--
+    Example second user (commented out):
+    <authorize username="user2" password="AnotherSecurePass!">
+        <connection name="auto-mcs">
+            <protocol>vnc</protocol>
+            <param name="hostname">automcs</param>
+            <param name="port">5900</param>
+            <param name="password">AnotherSecurePass!</param>
+        </connection>
+    </authorize>
+    -->
+
+</user-mapping>
