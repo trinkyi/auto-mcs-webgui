@@ -1,38 +1,22 @@
 version: '3.8'
 
-#-------------------------------------------------------------------
-# Docker Compose Stack for auto-mcs + Apache Guacamole
-# 
-# This stack boots three services:
-#   1) auto-mcs   - Minecraft Automation GUI with VNC server
-#   2) guacd      - Guacamole proxy daemon for remote desktop
-#   3) guacamole  - HTML5 client to access VNC via browser
-#
-# To use:
-#   - Place this file alongside your Dockerfile for auto-mcs (context: '.')
-#   - Create named volumes or directories for persistence
-#   - Define the VNC_PASSWORD environment variable before deploying
-#   - Deploy via CLI (docker-compose up -d)
-#-------------------------------------------------------------------
-
 services:
   automcs:
     build:
-      context: .                 # Build context: directory containing Dockerfile
-      dockerfile: Dockerfile     # Dockerfile for auto-mcs + VNC
+      context: .                 # Directory with your Dockerfile
+      dockerfile: Dockerfile
     container_name: auto-mcs
     environment:
-      - VNC_PASSWORD=${VNC_PASSWORD}  # VNC password; set via 'export VNC_PASSWORD=yourpass'
+      - VNC_PASSWORD=${VNC_PASSWORD}  # Set via `export VNC_PASSWORD=…`
     volumes:
-      - auto-mcs-data:/data      # Persist auto-mcs world and config data
+      - auto-mcs-data:/data      # ← matches the “auto-mcs-data” volume below
     expose:
-      - "5900"                  # Expose VNC server port internally for Guacamole
-    restart: unless-stopped      # Always restart unless explicitly stopped
+      - "5900"                   # VNC port for Guacamole to connect
+    restart: unless-stopped
 
   guacd:
     image: guacamole/guacd:latest
     container_name: guacd
-    # guacd listens for Guacamole client connections on port 4822 by default
     restart: unless-stopped
 
   guacamole:
@@ -42,24 +26,22 @@ services:
       - guacd
       - automcs
     environment:
-      GUACD_HOSTNAME: guacd      # Hostname or service name of guacd
-      GUACD_PORT: 4822           # Default port guacd listens on
-      # If using a custom guacamole.properties or user-mapping.xml,
-      # mount them into /etc/guacamole via the volume below.
+      GUACD_HOSTNAME: guacd      # guacd service host
+      GUACD_PORT: 4822
     ports:
-      - "9000:8080"             # Map Guacamole web UI to host port 9000
+      - "9000:8080"              # Exposes Guacamole UI on host:9000
     volumes:
-      - guacamole:/etc/guacamole # Mount custom config (user-mapping.xml, extensions)
+      - guacamole-config:/etc/guacamole  # ← matches the “guacamole-config” volume below
     restart: unless-stopped
 
-# Use named volumes to persist data; avoids host-path issues in Portainer
+# Named volumes must be defined exactly as referenced above:
 volumes:
-  auto-mcs:
+  auto-mcs-data:
     name: auto-mcs_data
-  guacamole:
+  guacamole-config:
     name: guacamole_config
 
-# All services share this default network
+# (Optional) Explicit network naming—Compose will create this for you:
 networks:
   default:
     name: automcs_network
