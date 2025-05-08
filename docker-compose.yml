@@ -1,14 +1,9 @@
-version: "3.8"
-
-# Load your master config
-env_file:
-  - configuration.conf
+version: '3.8'
 
 services:
   gui-app:
     build:
-      context: ./gui-container
-      dockerfile: Dockerfile
+      context: ./gui-app
       args:
         GUI_USER: "${GUI_USER}"
         GUI_GROUP: "${GUI_GROUP}"
@@ -18,69 +13,69 @@ services:
     image: "${PROJECT_NAME}:latest"
     container_name: "${PROJECT_NAME}-gui-container"
     env_file:
-      - configuration.conf
+      - .env
     expose:
-      - "${VNC_PORT}"
+      - ${VNC_PORT}
     networks:
-      - "${NETWORK_NAME}"
+      - ${NETWORK_NAME}
     restart: unless-stopped
 
   guacd:
-    image: guacamole/guacd:latest
+    image: guacamole/guacd:1.5.4
     container_name: "${PROJECT_NAME}-guacd"
     expose:
-      - "4822"
+      - 4822
     networks:
-      - "${NETWORK_NAME}"
+      - ${NETWORK_NAME}
     restart: unless-stopped
 
   guacamole:
-    image: guacamole/guacamole:${GUACAMOLE_VERSION}
+    image: guacamole/guacamole:1.5.4
     container_name: "${PROJECT_NAME}-guacamole"
     depends_on:
       - guacd
       - db
     env_file:
-      - configuration.conf
+      - .env
     ports:
       - "${GUACAMOLE_PORT}:8080"
     environment:
       GUACD_HOSTNAME: guacd
       GUACD_PORT: 4822
-      # MySQL backend settings
       MYSQL_HOSTNAME: db
-      MYSQL_PORT: 3306
       MYSQL_DATABASE: "${MYSQL_DB_NAME}"
       MYSQL_USER: "${MYSQL_DB_USER}"
       MYSQL_PASSWORD: "${MYSQL_DB_PASSWORD}"
     volumes:
-      # load the JDBC extension
-      - ./extensions/guacamole-auth-jdbc-mysql-${GUACAMOLE_VERSION}.jar:/etc/guacamole/extensions/guacamole-auth-jdbc-mysql.jar:ro
+      # Mount the JDBC auth extension and MySQL driver
+      - ./extensions:/etc/guacamole/extensions:ro
+      - ./lib:/etc/guacamole/lib:ro
     networks:
-      - "${NETWORK_NAME}"
+      - ${NETWORK_NAME}
     restart: unless-stopped
 
   db:
     image: mysql:8.0
     container_name: "${PROJECT_NAME}-db"
     env_file:
-      - configuration.conf
+      - .env
     environment:
       MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
       MYSQL_DATABASE: "${MYSQL_DB_NAME}"
       MYSQL_USER: "${MYSQL_DB_USER}"
       MYSQL_PASSWORD: "${MYSQL_DB_PASSWORD}"
     volumes:
-      # init scripts run in lexicographic order
+      # Init schema + admin user on first run
       - ./mysql-init:/docker-entrypoint-initdb.d:ro
-      - "${VOLUME_DB_DATA}:/var/lib/mysql"
+      # Persist the database data
+      - ${VOLUME_DB_DATA}:/var/lib/mysql
     networks:
-      - "${NETWORK_NAME}"
+      - ${NETWORK_NAME}
     restart: unless-stopped
 
 networks:
-  "${NETWORK_NAME}":
+  ${NETWORK_NAME}:
     driver: bridge
 
 volumes:
-  "${VOLUME_DB_DATA}":
+  ${VOLUME_DB_DATA}:
