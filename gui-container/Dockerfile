@@ -1,8 +1,9 @@
 #── 0. Build-time args ─────────────────────────
 ARG DEBIAN_FRONTEND=noninteractive
-ARG AUTO_MCS_URL
 
 FROM debian:bookworm-slim
+
+ARG AUTO_MCS_URL
 
 #── 1. Install dependencies ────────────────────
 RUN apt-get update \

@@ -2,11 +2,11 @@
 set -euo pipefail
 
 # 1) Load config
-if [[ ! -f configuration.conf ]]; then
-  echo "ERROR: configuration.conf not found!" >&2
+if [[ ! -f .env ]]; then
+  echo "ERROR: .env not found!" >&2
   exit 1
 fi
-source configuration.conf
+source .env
 
 # 2) Prepare dirs
 mkdir -p extensions mysql-init
@@ -29,16 +29,15 @@ docker run --rm \
 
 # 5) Append initial admin user
 echo ">>> Appending initial admin user (${ADMIN_USERNAME})"
-SALT=$(openssl rand -hex 16)
-HASH=$(printf '%s%s' "${SALT}" "${ADMIN_PASSWORD}" | sha256sum | awk '{print $1}')
+SALT=$(openssl rand -hex 16 | tr '[:lower:]' '[:upper:]')
+HASH=$(printf '%s%s' "${ADMIN_PASSWORD}" "${SALT}" \
+       | sha256sum | awk '{print $1}')
 
 cat >> mysql-init/initdb.sql <<EOF
-
--- Insert initial admin user
 INSERT INTO guacamole_user
   (username, password_salt, password_hash, password_date, disabled)
 VALUES
-  ('${ADMIN_USERNAME}', '${SALT}', UNHEX('${HASH}'), NOW(), FALSE);
+  ('${ADMIN_USERNAME}', UNHEX('${SALT}'), UNHEX('${HASH}'), NOW(), FALSE);
 
 INSERT INTO guacamole_user_property
   (user_id, property_name, property_value)
