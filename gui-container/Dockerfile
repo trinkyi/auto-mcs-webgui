@@ -31,7 +31,7 @@ RUN chmod +x /start.sh
 # VNC_PORT (default 5900) is pulled from your .env at runtime
 EXPOSE 5900
 HEALTHCHECK --interval=30s --timeout=3s \
-  CMD nc -z localhost 5900 || exit 1
+  CMD bash -c "echo >/dev/tcp/localhost/5900" || exit 1
 
 #── 5. Entrypoint ───────────────────────────────
 ENTRYPOINT ["/usr/bin/tini", "--"]
