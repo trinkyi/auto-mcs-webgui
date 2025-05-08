@@ -1,44 +1,46 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Load your config variables
-if [[ ! -f configuration.conf ]]; then
-  echo "Error: configuration.conf not found!" >&2
-  exit 1
-fi
+# Load all variables from configuration.conf
 source configuration.conf
 
-# Directories to populate
-mkdir -p extensions mysql-init
+# Create directories for extension JAR, JDBC driver, and SQL init
+mkdir -p extensions lib mysql-init                                  :contentReference[oaicite:0]{index=0}
 
 ########################################
-# 1) Download the Guacamole JDBC .jar
+# 1) Download Guacamole JDBC extension
 ########################################
-JDBC_JAR=guacamole-auth-jdbc-mysql-${GUACAMOLE_VERSION}.jar
-JDBC_URL="https://apache.org/dyn/closer.cgi/guacamole/${GUACAMOLE_VERSION}/binary/guacamole-auth-jdbc-mysql-${GUACAMOLE_VERSION}.tar.gz"
-
-echo "Fetching JDBC extension from ${JDBC_URL}..."
+JDBC_URL="https://downloads.apache.org/guacamole/${GUACAMOLE_VERSION}/binary/guacamole-auth-jdbc-${GUACAMOLE_VERSION}.tar.gz"
+echo "Fetching JDBC auth extension from ${JDBC_URL}"
 curl -sL "${JDBC_URL}" \
-  | tar xz --wildcards --strip-components=2 -C extensions '*/mysql/schema/*.jar'
-mv extensions/*.jar extensions/${JDBC_JAR}
-echo "  → Saved ${JDBC_JAR}"
+  | tar xz \
+      --wildcards \
+      --strip-components=2 \
+      -C extensions \
+      '*/mysql/guacamole-auth-jdbc-mysql-'"${GUACAMOLE_VERSION}"'.jar'  :contentReference[oaicite:1]{index=1}
 
 ########################################
-# 2) Fetch the SQL schema
+# 2) Download MySQL Connector/J driver
 ########################################
-SCHEMA_URL="https://raw.githubusercontent.com/apache/guacamole-server/${GUACAMOLE_VERSION}/guacamole-auth-jdbc/modules/mysql/schema/001-create-schema.sql"
-echo "Downloading schema DDL..."
-curl -sL "${SCHEMA_URL}" > mysql-init/001-create-schema.sql
-echo "  → Wrote mysql-init/001-create-schema.sql"
+CONNECTOR_URL="https://repo1.maven.org/maven2/mysql/mysql-connector-java/${MYSQL_CONNECTOR_VERSION}/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}.jar"
+echo "Downloading MySQL Connector/J from ${CONNECTOR_URL}"
+curl -sL "${CONNECTOR_URL}" \
+  -o lib/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}.jar        :contentReference[oaicite:2]{index=2}
 
 ########################################
-# 3) Generate admin user SQL
+# 3) Generate combined schema SQL
 ########################################
-echo "Generating guacamole user SQL..."
-# Use ADMIN_USERNAME and ADMIN_PASSWORD now
-SALT=$(openssl rand -hex 16)
-HASH=$(printf '%s%s' "${SALT}" "${ADMIN_PASSWORD}" \
-       | sha256sum | awk '{print $1}')
+echo "Generating database initialization SQL via initdb.sh"
+docker run --rm \
+  guacamole/guacamole:"${GUACAMOLE_VERSION}" \
+  /opt/guacamole/bin/initdb.sh --mysql > mysql-init/initdb.sql   :contentReference[oaicite:3]{index=3}
+
+########################################
+# 4) Create initial admin user SQL
+########################################
+echo "Generating initial Guacamole admin user SQL"
+SALT=$(openssl rand -hex 16)                                      :contentReference[oaicite:4]{index=4}
+HASH=$(printf '%s%s' "${SALT}" "${ADMIN_PASSWORD}" | sha256sum | awk '{print $1}')  :contentReference[oaicite:5]{index=5}
 
 cat > mysql-init/002-create-admin-user.sql <<EOF
 USE \`${MYSQL_DB_NAME}\`;
@@ -61,7 +63,6 @@ VALUES
     'password-salt',
     '${SALT}'
   );
-EOF
-echo "  → Wrote mysql-init/002-create-admin-user.sql"
+EOF                                                                 :contentReference[oaicite:6]{index=6}
 
-echo "Pre-installation complete. You can now run: docker-compose up -d --build"
+echo "Pre-installation complete – SQL files in mysql-init/, JARs in extensions/ and lib/"
