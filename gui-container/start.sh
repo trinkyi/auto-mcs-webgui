@@ -9,7 +9,7 @@ fluxbox &
 
 # VNC server reading password from $VNC_PASSWORD
 x11vnc -display :0 \
-       -rfbport ${VNC_PORT} \
+       -rfbport 5900 \
        -passwd "${VNC_PASSWORD}" \
        -forever -shared
 

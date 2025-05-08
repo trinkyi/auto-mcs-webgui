@@ -1,23 +1,19 @@
 version: '3.8'
 
 services:
-  gui-app:
+  gui-container:
     build:
-      context: ./gui-app
+      context: ./gui-container
       args:
-        GUI_USER: "${GUI_USER}"
-        GUI_GROUP: "${GUI_GROUP}"
-        GUI_UID: "${GUI_UID}"
-        GUI_GID: "${GUI_GID}"
         AUTO_MCS_URL: "${AUTO_MCS_URL}"
     image: "${PROJECT_NAME}:latest"
     container_name: "${PROJECT_NAME}-gui-container"
     env_file:
       - .env
     expose:
-      - ${VNC_PORT}
+      - 5900
     networks:
-      - ${NETWORK_NAME}
+      - appnet
     restart: unless-stopped
 
   guacd:
@@ -26,7 +22,7 @@ services:
     expose:
       - 4822
     networks:
-      - ${NETWORK_NAME}
+      - appnet
     restart: unless-stopped
 
   guacamole:
@@ -38,20 +34,19 @@ services:
     env_file:
       - .env
     ports:
-      - "${GUACAMOLE_PORT}:8080"
+      - "${GUACAMOLE_PORT}:8080"  
     environment:
       GUACD_HOSTNAME: guacd
-      GUACD_PORT: 4822
+      GUACD_PORT:     4822
       MYSQL_HOSTNAME: db
       MYSQL_DATABASE: "${MYSQL_DB_NAME}"
-      MYSQL_USER: "${MYSQL_DB_USER}"
+      MYSQL_USER:     "${MYSQL_DB_USER}"
       MYSQL_PASSWORD: "${MYSQL_DB_PASSWORD}"
     volumes:
-      # Mount the JDBC auth extension and MySQL driver
       - ./extensions:/etc/guacamole/extensions:ro
       - ./lib:/etc/guacamole/lib:ro
     networks:
-      - ${NETWORK_NAME}
+      - appnet
     restart: unless-stopped
 
   db:
@@ -61,21 +56,21 @@ services:
       - .env
     environment:
       MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
-      MYSQL_DATABASE: "${MYSQL_DB_NAME}"
-      MYSQL_USER: "${MYSQL_DB_USER}"
-      MYSQL_PASSWORD: "${MYSQL_DB_PASSWORD}"
+      MYSQL_DATABASE:      "${MYSQL_DB_NAME}"
+      MYSQL_USER:          "${MYSQL_DB_USER}"
+      MYSQL_PASSWORD:      "${MYSQL_DB_PASSWORD}"
     volumes:
-      # Init schema + admin user on first run
       - ./mysql-init:/docker-entrypoint-initdb.d:ro
-      # Persist the database data
-      - ${VOLUME_DB_DATA}:/var/lib/mysql
+      - db_data:/var/lib/mysql
     networks:
-      - ${NETWORK_NAME}
+      - appnet
     restart: unless-stopped
 
 networks:
-  ${NETWORK_NAME}:
+  appnet:
+    name: "${NETWORK_NAME}"  
     driver: bridge
 
 volumes:
-  ${VOLUME_DB_DATA}:
+  db_data:
+    name: "${VOLUME_DB_DATA}" 
