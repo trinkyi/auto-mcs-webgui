@@ -1,65 +1,86 @@
 version: "3.8"
 
+# Load your master config
+env_file:
+  - configuration.conf
+
 services:
-
-  # 1) MySQL for Guacamole authentication
-  guacamole-db:
-    image: mysql:8.0
-    container_name: guacamole-db
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpass123
-      MYSQL_DATABASE: guacamole_db
-      MYSQL_USER: guacamole_user
-      MYSQL_PASSWORD: guac_pass123
-    volumes:
-      - guac_db_data:/var/lib/mysql
-    networks:
-      - guacnet
-
-  # 2) Guacamole daemon
-  guacd:
-    image: guacamole/guacd
-    container_name: guacd
-    networks:
-      - guacnet
-
-  # 3) Guacamole web app, hooked up to MySQL above
-  guacamole:
-    image: guacamole/guacamole
-    container_name: guacamole
-    depends_on:
-      - guacamole-db
-      - guacd
-    environment:
-      MYSQL_HOSTNAME: guacamole-db
-      MYSQL_PORT:     3306
-      MYSQL_DATABASE: guacamole_db
-      MYSQL_USER:     guacamole_user
-      MYSQL_PASSWORD: guac_pass123
-    ports:
-      - "9000:8080"
-    networks:
-      - guacnet
-
-  # 4) Your Auto-MCS VNC+GUI container
-  automcs:
+  gui-app:
     build:
-      context: .
+      context: ./gui-container
+      dockerfile: Dockerfile
       args:
-        AUTO_MCS_VERSION: ${AUTO_MCS_VERSION:-2.3}
-    image: ${IMAGE_NAME:-auto-mcs-webgui}:${IMAGE_TAG:-latest}
-    container_name: automcs
-    environment:
-      # VNC password passed into the container
-      VNC_PASSWORD: ${VNC_PASSWORD:-changeme}
-    ports:
-      - "5900:5900"
+        GUI_USER: "${GUI_USER}"
+        GUI_GROUP: "${GUI_GROUP}"
+        GUI_UID: "${GUI_UID}"
+        GUI_GID: "${GUI_GID}"
+        AUTO_MCS_URL: "${AUTO_MCS_URL}"
+    image: "${PROJECT_NAME}:latest"
+    container_name: "${PROJECT_NAME}-gui-container"
+    env_file:
+      - configuration.conf
+    expose:
+      - "${VNC_PORT}"
     networks:
-      - guacnet
+      - "${NETWORK_NAME}"
+    restart: unless-stopped
 
-volumes:
-  guac_db_data:
+  guacd:
+    image: guacamole/guacd:latest
+    container_name: "${PROJECT_NAME}-guacd"
+    expose:
+      - "4822"
+    networks:
+      - "${NETWORK_NAME}"
+    restart: unless-stopped
+
+  guacamole:
+    image: guacamole/guacamole:${GUACAMOLE_VERSION}
+    container_name: "${PROJECT_NAME}-guacamole"
+    depends_on:
+      - guacd
+      - db
+    env_file:
+      - configuration.conf
+    ports:
+      - "${GUACAMOLE_PORT}:8080"
+    environment:
+      GUACD_HOSTNAME: guacd
+      GUACD_PORT: 4822
+      # MySQL backend settings
+      MYSQL_HOSTNAME: db
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: "${MYSQL_DB_NAME}"
+      MYSQL_USER: "${MYSQL_DB_USER}"
+      MYSQL_PASSWORD: "${MYSQL_DB_PASSWORD}"
+    volumes:
+      # load the JDBC extension
+      - ./extensions/guacamole-auth-jdbc-mysql-${GUACAMOLE_VERSION}.jar:/etc/guacamole/extensions/guacamole-auth-jdbc-mysql.jar:ro
+    networks:
+      - "${NETWORK_NAME}"
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    container_name: "${PROJECT_NAME}-db"
+    env_file:
+      - configuration.conf
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+      MYSQL_DATABASE: "${MYSQL_DB_NAME}"
+      MYSQL_USER: "${MYSQL_DB_USER}"
+      MYSQL_PASSWORD: "${MYSQL_DB_PASSWORD}"
+    volumes:
+      # init scripts run in lexicographic order
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
+      - "${VOLUME_DB_DATA}:/var/lib/mysql"
+    networks:
+      - "${NETWORK_NAME}"
+    restart: unless-stopped
 
 networks:
-  guacnet:
+  "${NETWORK_NAME}":
     driver: bridge
+
+volumes:
+  "${VOLUME_DB_DATA}":
