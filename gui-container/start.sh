@@ -2,7 +2,7 @@
 # start.sh
 
 # launch a headless X server
-Xvfb :0 -screen 0 ${VNC_GEOMETRY}x${VNC_DEPTH} &
+Xvfb :0 -screen 0 1920x1080x24 &
 
 # simple window manager
 fluxbox &
