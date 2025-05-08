@@ -1,47 +1,65 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  automcs:
-    build:
-      context: .                 # Directory with your Dockerfile
-      dockerfile: Dockerfile
-    container_name: auto-mcs
+
+  # 1) MySQL for Guacamole authentication
+  guacamole-db:
+    image: mysql:8.0
+    container_name: guacamole-db
     environment:
-      - VNC_PASSWORD=${VNC_PASSWORD}  # Set via `export VNC_PASSWORD=…`
+      MYSQL_ROOT_PASSWORD: rootpass123
+      MYSQL_DATABASE: guacamole_db
+      MYSQL_USER: guacamole_user
+      MYSQL_PASSWORD: guac_pass123
     volumes:
-      - auto-mcs-data:/data      # ← matches the “auto-mcs-data” volume below
-    expose:
-      - "5900"                   # VNC port for Guacamole to connect
-    restart: unless-stopped
+      - guac_db_data:/var/lib/mysql
+    networks:
+      - guacnet
 
+  # 2) Guacamole daemon
   guacd:
-    image: guacamole/guacd:latest
+    image: guacamole/guacd
     container_name: guacd
-    restart: unless-stopped
+    networks:
+      - guacnet
 
+  # 3) Guacamole web app, hooked up to MySQL above
   guacamole:
-    image: guacamole/guacamole:latest
+    image: guacamole/guacamole
     container_name: guacamole
     depends_on:
+      - guacamole-db
       - guacd
-      - automcs
     environment:
-      GUACD_HOSTNAME: guacd      # guacd service host
-      GUACD_PORT: 4822
+      MYSQL_HOSTNAME: guacamole-db
+      MYSQL_PORT:     3306
+      MYSQL_DATABASE: guacamole_db
+      MYSQL_USER:     guacamole_user
+      MYSQL_PASSWORD: guac_pass123
     ports:
-      - "9000:8080"              # Exposes Guacamole UI on host:9000
-    volumes:
-      - guacamole-config:/etc/guacamole  # ← matches the “guacamole-config” volume below
-    restart: unless-stopped
+      - "9000:8080"
+    networks:
+      - guacnet
 
-# Named volumes must be defined exactly as referenced above:
+  # 4) Your Auto-MCS VNC+GUI container
+  automcs:
+    build:
+      context: .
+      args:
+        AUTO_MCS_VERSION: ${AUTO_MCS_VERSION:-2.3}
+    image: ${IMAGE_NAME:-auto-mcs-webgui}:${IMAGE_TAG:-latest}
+    container_name: automcs
+    environment:
+      # VNC password passed into the container
+      VNC_PASSWORD: ${VNC_PASSWORD:-changeme}
+    ports:
+      - "5900:5900"
+    networks:
+      - guacnet
+
 volumes:
-  auto-mcs-data:
-    name: auto-mcs_data
-  guacamole-config:
-    name: guacamole_config
+  guac_db_data:
 
-# (Optional) Explicit network naming—Compose will create this for you:
 networks:
-  default:
-    name: automcs_network
+  guacnet:
+    driver: bridge
