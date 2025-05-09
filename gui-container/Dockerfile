@@ -1,38 +1,34 @@
-#── 0. Build-time args ─────────────────────────
-ARG DEBIAN_FRONTEND=noninteractive
+# Dockerfile zur Bereitstellung einer leichten Desktop-Umgebung mit VNC
+# "Linux Lite" wird hier annähernd durch Ubuntu + XFCE ersetzt, da kein offizielles Linux Lite Base-Image verfügbar ist.
 
-FROM debian:bookworm-slim
+FROM ubuntu:22.04
 
-ARG AUTO_MCS_URL
+# Non-interactive und Schweizer Zeitzone
+ENV DEBIAN_FRONTEND=noninteractive TZ=Europe/Zurich
 
-#── 1. Install dependencies ────────────────────
-RUN apt-get update \
- && apt-get install -y --no-install-recommends \
-      xvfb fluxbox x11vnc wget unzip ca-certificates tini \
- && rm -rf /var/lib/apt/lists/*
+# Desktop-Umgebung (XFCE) und VNC-Server installieren
+RUN apt-get update && \
+    apt-get install -y xfce4 xfce4-goodies tightvncserver dbus-x11 x11-xserver-utils && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-#── 2. Fetch & install auto-mcs ─────────────────
-# create install dir and unzip as root
-RUN mkdir -p /opt/auto-mcs \
- && wget -O /tmp/auto-mcs.zip "${AUTO_MCS_URL}" \
- && unzip /tmp/auto-mcs.zip -d /opt/auto-mcs \
- && rm /tmp/auto-mcs.zip \
- && chmod +x /opt/auto-mcs/auto-mcs
+# Benutzer für VNC-Zugriff anlegen
+RUN useradd -m -s /bin/bash vncuser && \
+    echo "vncuser:password" | chpasswd
 
-# make auto-mcs binary available on PATH
-ENV PATH="/opt/auto-mcs:${PATH}"
+USER vncuser
+WORKDIR /home/vncuser
 
-#── 3. Copy & prepare startup script ───────────
+# VNC-Passwort konfigurieren (Standard: "password")
+RUN mkdir -p /home/vncuser/.vnc && \
+    echo "password" | vncpasswd -f > /home/vncuser/.vnc/passwd && \
+    chmod 600 /home/vncuser/.vnc/passwd
 
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
+# Startup-Skript für XFCE einrichten
+RUN printf "#!/bin/bash\nxrdb $HOME/.Xresources\nstartxfce4 &\n" > /home/vncuser/.vnc/xstartup && \
+    chmod +x /home/vncuser/.vnc/xstartup
 
-#── 4. Expose & healthcheck ────────────────────
-# VNC_PORT (default 5900) is pulled from your .env at runtime
+# VNC-Port freigeben
 EXPOSE 5900
-HEALTHCHECK --interval=30s --timeout=3s \
-  CMD bash -c "echo >/dev/tcp/localhost/5900" || exit 1
 
-#── 5. Entrypoint ───────────────────────────────
-ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["/start.sh"]
+# VNC-Server beim Containerstart auf Display :0 starten
+CMD ["vncserver", ":0", "-geometry", "1280x800", "-depth", "24", "-fg"]
